@@ -1,6 +1,6 @@
+#!/usr/bin/env python
 import subprocess
 import sys
-import os
 
 def run_logger(log_file):
     return subprocess.Popen(['python3', 'logger.py', log_file], stdin=subprocess.PIPE, text=True)
@@ -9,8 +9,16 @@ def run_encryption():
     return subprocess.Popen(['python3', 'encryption.py'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
 
 def log(logger_proc, action, message):
-    logger_proc.stdin.write(f"{action} {message}\n")
-    logger_proc.stdin.flush()
+    if logger_proc.poll() is None:  # Check if the logger process is still running
+        try:
+            logger_proc.stdin.write(f"{action} {message}\n")
+            logger_proc.stdin.flush()
+        except BrokenPipeError:
+            print("Logger process is not accepting input (broken pipe).")
+            sys.exit(1)
+    else:
+        print("Logger process has terminated unexpectedly.")
+        sys.exit(1)
 
 def send_encryption_command(enc_proc, command):
     enc_proc.stdin.write(command + "\n")
@@ -28,7 +36,9 @@ def main():
     logger_proc = run_logger(log_file)
     enc_proc = run_encryption()
 
-    history = []
+    # History will now store tuples (type, string)
+    history = []  # [(type, string), ...]
+
     log(logger_proc, "START", "Driver program started")
 
     while True:
@@ -41,23 +51,9 @@ def main():
         choice = input("Choose an option: ")
 
         if choice == "1":
-            print("1. Enter a new password")
-            print("2. Select from history")
-            option = input("Choose an option: ")
-            if option == "1":
-                password = input("Enter a new password: ")
-                send_encryption_command(enc_proc, f"PASSKEY {password}")
-                log(logger_proc, "PASSKEY", "Password set")
-            elif option == "2":
-                if history:
-                    for idx, item in enumerate(history):
-                        print(f"{idx+1}. {item}")
-                    selection = int(input("Select a string from history: ")) - 1
-                    password = history[selection]
-                    send_encryption_command(enc_proc, f"PASSKEY {password}")
-                    log(logger_proc, "PASSKEY", "Password set from history")
-                else:
-                    print("No history available")
+            password = input("Enter a new password: ")
+            send_encryption_command(enc_proc, f"PASSKEY {password}")
+            log(logger_proc, "PASSKEY", "Password set")
 
         elif choice == "2":
             print("1. Enter a new string")
@@ -68,19 +64,26 @@ def main():
                 result = send_encryption_command(enc_proc, f"ENCRYPT {text}")
                 print(result)
                 if result.startswith("RESULT"):
-                    history.append(text)
+                    encrypted_string = result.split(' ', 1)[1]
+                    history.append(('plain', text))  # Store the plaintext
+                    history.append(('encrypted', encrypted_string))  # Store the encrypted string
                 log(logger_proc, "ENCRYPT", text)
             elif option == "2":
-                if history:
-                    for idx, item in enumerate(history):
-                        print(f"{idx+1}. {item}")
-                    selection = int(input("Select a string from history: ")) - 1
-                    text = history[selection]
-                    result = send_encryption_command(enc_proc, f"ENCRYPT {text}")
-                    print(result)
-                    log(logger_proc, "ENCRYPT", text)
-                else:
-                    print("No history available")
+                # Filter history to show only plaintext
+                plain_texts = [item for item in history if item[0] == 'plain']
+                if not plain_texts:
+                    print("No plaintext available in history.")
+                    continue
+                for idx, item in enumerate(plain_texts):
+                    print(f"{idx+1}. {item[1]}")
+                selection = int(input("Select a string from history: ")) - 1
+                text = plain_texts[selection][1]
+                result = send_encryption_command(enc_proc, f"ENCRYPT {text}")
+                print(result)
+                if result.startswith("RESULT"):
+                    encrypted_string = result.split(' ', 1)[1]
+                    history.append(('encrypted', encrypted_string))
+                log(logger_proc, "ENCRYPT", text)
 
         elif choice == "3":
             print("1. Enter a new string")
@@ -90,31 +93,33 @@ def main():
                 text = input("Enter a string to decrypt: ")
                 result = send_encryption_command(enc_proc, f"DECRYPT {text}")
                 print(result)
-                if result.startswith("RESULT"):
-                    history.append(text)
                 log(logger_proc, "DECRYPT", text)
             elif option == "2":
-                if history:
-                    for idx, item in enumerate(history):
-                        print(f"{idx+1}. {item}")
-                    selection = int(input("Select a string from history: ")) - 1
-                    text = history[selection]
-                    result = send_encryption_command(enc_proc, f"DECRYPT {text}")
-                    print(result)
-                    log(logger_proc, "DECRYPT", text)
-                else:
-                    print("No history available")
+                # Filter history to show only encrypted strings
+                encrypted_texts = [item for item in history if item[0] == 'encrypted']
+                if not encrypted_texts:
+                    print("No encrypted strings available in history.")
+                    continue
+                for idx, item in enumerate(encrypted_texts):
+                    print(f"{idx+1}. {item[1]}")
+                selection = int(input("Select a string from history: ")) - 1
+                text = encrypted_texts[selection][1]
+                result = send_encryption_command(enc_proc, f"DECRYPT {text}")
+                print(result)
+                log(logger_proc, "DECRYPT", text)
 
         elif choice == "4":
             print("History:")
             for idx, item in enumerate(history):
-                print(f"{idx+1}. {item}")
+                print(f"{idx+1}. {item[1]} ({item[0]})")
 
         elif choice == "5":
             send_encryption_command(enc_proc, "QUIT")
             log(logger_proc, "QUIT", "Driver program exiting")
             logger_proc.stdin.write("QUIT\n")
             logger_proc.stdin.flush()
+            logger_proc.wait()
+            enc_proc.wait()
             break
 
 if __name__ == "__main__":
