@@ -1,0 +1,11 @@
+2024-10-12 15:20 [START] Driver program started
+2024-10-12 15:20 [PASSKEY] Password set
+2024-10-12 15:21 [ENCRYPT] NIKIN
+2024-10-12 15:21 [PASSKEY] Password set from history
+2024-10-12 15:23 [START] Driver program started
+2024-10-12 15:23 [PASSKEY] Password set
+2024-10-12 15:23 [START] Driver program started
+2024-10-12 15:23 [PASSKEY] Password set
+2024-10-12 15:23 [ENCRYPT] HELLO
+2024-10-12 15:24 [DECRYPT] HELLO
+2024-10-12 15:24 [QUIT] Driver program exiting
