@@ -110,17 +110,4 @@ def main():
 
         elif choice == "4":
             print("History:")
-            for idx, item in enumerate(history):
-                print(f"{idx+1}. {item[1]} ({item[0]})")
-
-        elif choice == "5":
-            send_encryption_command(enc_proc, "QUIT")
-            log(logger_proc, "QUIT", "Driver program exiting")
-            logger_proc.stdin.write("QUIT\n")
-            logger_proc.stdin.flush()
-            logger_proc.wait()
-            enc_proc.wait()
-            break
-
-if __name__ == "__main__":
-    main()
+            for idx, item in enumerate
